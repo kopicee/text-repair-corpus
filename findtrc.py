@@ -130,7 +130,7 @@ def error2str(exc):
     return exc.__class__.__name__ + ': ' + str(exc)
 
 
-def iterated_lev_dist(a, b, subweight=1, tolerance=5):
+def iterated_lev_dist(a, b, tolerance=5):
     """Calculates edit distance between strings a and b.
 
     This is a version of the Wagner-Fischer algorithm for calculating
@@ -144,8 +144,11 @@ def iterated_lev_dist(a, b, subweight=1, tolerance=5):
     exceeds the value given by `tolerance`. The short-circuited output is -1,
     which can be assumed to mean that the edit distance is at least 5.
 
-    The cost of substitutions can be weighted with the `subweight` argument.
-    For example, to let a substitution add 2 to edit distance, pass subweight=2.
+    Args:
+    a, b (str): Strings to compare.
+    tolerance (int): The maximum distance we are interested in. This is used to
+                     short-circuit the function when the minimum possible cost
+                     exceeds this value.
     """
     lenA, lenB = _len(a), _len(b)
 
@@ -169,19 +172,17 @@ def iterated_lev_dist(a, b, subweight=1, tolerance=5):
     v1 = [0] * slots
 
     # print('     ', '  '.join(t))
-    # Walking over rows. Each row represents one step along the source string
-    # Last cell of last row is edit distance
+    # Walking over rows. Each row represents one step along the source string.
+    # Last cell of last row gives us the edit distance.
     for i, A in enumerate(a):
         # First cell of each row is for comparison against empty string
         # the cost is always equal to length of source string walked so far
         v1[0] = i + 1
 
         for j, B in enumerate(b):
-            # For each cell j+1 in the row, look at preceding cell, increase
-            # by
             delCost = v0[j + 1] + 1  # j+1 since the first value in the row
                                      # is distance from an empty str
-            subCost = v0[j] + (A != B) * subweight  # substitution
+            subCost = v0[j] + (A != B)  # substitution
             insCost = v1[j] + 1  # the insert cost is always at least 1
             v1[j + 1] = _min(delCost, insCost, subCost)
 
@@ -193,33 +194,33 @@ def iterated_lev_dist(a, b, subweight=1, tolerance=5):
 
 # def levenshtein_distance(a, b, subweight=1, tolerance=5, sentinel=1000):
 #     """Recursively calculates Levenshtein's edit distance between two strings
-
+#
 #     Adapted from:
 #     https://en.wikipedia.org/wiki/Levenshtein_distance
-
+#
 #     Args:
 #     a, b: str - Strings
-
+#
 #     """
 #     i, j = _len(a), _len(b)
-
+#
 #     # Upper bound is length diff, quit if length difference is too big
 #     if (i - j > tolerance) or (j - i > tolerance):
 #         return sentinel
-
+#
 #     # Quit early if we know the minimum number of substitutions to make will
 #     # already be too big
 #     min_substitutions = _len({*a}.symmetric_difference({*b})) // 2
 #     if min_substitutions > tolerance:
 #         return sentinel
-
+#
 #     # Special case where one of the strings is length 0
 #     if not (i * j):
 #         return _max(i, j)
-
+#
 #     subcost = subweight * (a[-1] != b[-1])
 #     A, B = a[:-1], b[:-1]
-
+#
 #     return _min(
 #         levenshtein_distance(A, b) + 1,
 #         levenshtein_distance(a, B) + 1,
@@ -285,10 +286,8 @@ class Message:
             self._tokens = tokens
         return self._tokens
 
-
     def token_count(self):
         return len(self.tokenized())
-
 
     def __str__(self):
         return self.raw
@@ -472,7 +471,7 @@ def compare_tokenized(repairmsg, targetmsg):
         return -1
 
     # min() will return the tuple with lowest dist
-    repair, target, dist = min(outputs, key=lambda tup: tup[2])  # index [2] gives dist
+    repair, target, dist = min(outputs, key=lambda tup: tup[2]) # [2] is dist
     return repair, target, dist
 
 
@@ -482,7 +481,6 @@ def calc_confidence_score(msg, target_candidate):
         return -1
     if not target_candidate.parsed:
         return -1
-
     if msg.content.startswith('**'):
         return -1
 
@@ -521,6 +519,7 @@ def calc_confidence_score(msg, target_candidate):
             score += 1 / min_token_dist
 
     # Turn distance, 2/D where D=distance (weight: 0.5)
+    # FIXME: Probably works better if we penalize distance...
     score += 0.5 / (msg.id - target_candidate.id)
 
     # Penalize 0.5 for matching/different author (weight: -0.5)
@@ -533,7 +532,7 @@ def detect_repairs(path, backtrack=REPAIR_WINDOW_SIZE, min_confidence=0):
     msgs = [Message(x, msgid=i) for i, x in enumerate(get_lines(path))]
 
     for n, msg in enumerate(msgs):
-        if not n:
+        if n == 0:
             continue
 
         best_confidence = 0
@@ -575,6 +574,7 @@ def main():
     for srcfile in glob(UCC_GLOB, recursive=True):
         if not srcfile.endswith('txt'):
             continue
+        
         name = os.path.basename(srcfile)
         print(name)
 
@@ -587,7 +587,7 @@ def main():
             for msg in window:
                 if msg.id == r_msg.id:
                     # def push_repair(self, msgobj, score, repairstr, msgid, seq):
-                    doc.push_repair(r_msg, score, r_str, t_msg.id, 1)
+                    doc.push_repair(r_msg, score, r_str, t_msg.id, seq=1)
                 
                 elif msg.id == t_msg.id:
                     # def push_target(self, msgobj, *targetstrs):
@@ -598,11 +598,10 @@ def main():
 
             outfile = os.path.join(OUTDIR, f'{docid}.xml')
             with open(outfile, 'w', encoding='utf-8') as fs:
-                doc.dumps(fs)
+                doc.dumps(iostream=fs)
 
             docid += 1
 
-            # # print(f'{score}$${target.raw}$${repair.raw}')
             # print(f'{name}:{repairmsg.id} ({score}) ({target} -> {repair})')
             # print(f'{targetmsg.id:>5} {targetmsg.raw}')
             # print(f'{repairmsg.id:>5} {repairmsg.raw}')
