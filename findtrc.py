@@ -4,7 +4,7 @@
 Usage:
     python findtrc.py
 
-Requires Python 3.6+, NLTK (pip install nltk), and a copy of the Ubuntu Chat 
+Requires Python 3.6+, NLTK (pip install nltk), and a copy of the Ubuntu Chat
 Corpus (https://daviduthus.org/UCC/).
 
 Detects instances of text repair from the Ubuntu Chat Corpus[1]. Example of text
@@ -18,14 +18,14 @@ with the markup schema for the Text Repair Corpus.
 
 Repairs are detected by a combination of heuristics, including message- and
 word-level edit distance, turn distance between repair and a candidate target,
-use of markers such as *. Each heuristics contributes a weighted value to the 
+use of markers such as *. Each heuristics contributes a weighted value to the
 confidence score for the repair. Each linked target and repair are filtered for
 a minimum confidence score before inclusion in the Text Repair Corpus.
 
 As of writing, the script takes about 3 ~ 4 seconds to evaluate a medium-size
 file in the UCC.
 
-[1]: Uthus, D., & Aha, D. (2013). The Ubuntu Chat Corpus for Multiparticipant 
+[1]: Uthus, D., & Aha, D. (2013). The Ubuntu Chat Corpus for Multiparticipant
     Chat Analysis. In 2013 AAAI Spring Symposium Series.
     https://www.aaai.org/ocs/index.php/SSS/SSS13/paper/view/570
 """
@@ -137,8 +137,8 @@ def iterated_lev_dist(a, b, tolerance=5):
     Levenshtein distance. The core steps are adapted to Pythonic form from code
     listed on the Wikipedia page:
       https://en.wikipedia.org/wiki/Wagner%E2%80%93Fischer_algorithm
-    
-    This function short-circuits if 
+
+    This function short-circuits if
     (1) the difference in string lengths, or
     (2) half the number of characters unique to either string
     exceeds the value given by `tolerance`. The short-circuited output is -1,
@@ -364,11 +364,11 @@ class Document:
 
         for mtype, msg, *data in self.messages:
             content = msg.content
-            
+
             if mtype == self.TGT:
                 # data is a list of targetstrs
                 content = self.to_target(msg, data)
-            
+
             elif mtype == self.REP:
                 # data = [score, repairstr, msgid, seq]
                 content = self.to_repair(msg, *data)
@@ -390,13 +390,13 @@ class Document:
     def to_target(cls, msg, targetstrs: list):
         before, tagged, after = '', '', msg.content
         out = []
-        
+
         for i, tstr in enumerate(targetstrs):
             seq = i + 1
             before, tagged, after = cls.replace_to_tag(
                     cls.TGT, after, tstr, seq=seq)
             out.extend([before, tagged])
-        
+
         out.append(after)
         return ''.join(out)
 
@@ -418,11 +418,11 @@ class Document:
     @classmethod
     def tagged(cls, tag, content, **attrs):
         attr_str = ''
-        
+
         if attrs:
             xmlattrs = (f'{k}="{v}"' for k, v in attrs.items())
             attr_str = ' ' + (' '.join(xmlattrs) if attrs else '')
-        
+
         if content:
             return f'<{tag}{attr_str}>{content}</{tag}>'
         else:
@@ -574,7 +574,7 @@ def main():
     for srcfile in glob(UCC_GLOB, recursive=True):
         if not srcfile.endswith('txt'):
             continue
-        
+
         name = os.path.basename(srcfile)
         print(name)
 
@@ -588,11 +588,11 @@ def main():
                 if msg.id == r_msg.id:
                     # def push_repair(self, msgobj, score, repairstr, msgid, seq):
                     doc.push_repair(r_msg, score, r_str, t_msg.id, seq=1)
-                
+
                 elif msg.id == t_msg.id:
                     # def push_target(self, msgobj, *targetstrs):
                     doc.push_target(t_msg, t_str)
-                
+
                 else:
                     doc.push_message(msg)
 
